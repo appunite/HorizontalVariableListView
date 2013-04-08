@@ -1,16 +1,22 @@
-# built application files
-*.apk
-*.ap_
+HorizontalVariableListView/bin/
+HorizontalVariableListView/gen/
+HorizontalVariableListView/.settings/
+HorizontalVariableListView/.project
+HorizontalVariableListView/.classpath
+HorizontalVariableListView/local.properties
+HorizontalVariableListView/lint.xml
 
-# files for the dex VM
-*.dex
+Demo/bin/
+Demo/gen/
+Demo/.settings/
+Demo/.project
+Demo/.classpath
+Demo/local.properties
+Demo/lint.xml
 
-# Java class files
-*.class
-
-# generated files
-bin/
-gen/
-
-# Local configuration file (sdk path, etc)
-local.properties
+*.tmp
+*.bak
+*.swp
+*.launch
+**/.DS_Store
+.DS_Store
