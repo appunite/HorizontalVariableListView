@@ -96,10 +96,6 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	private List<Queue<View>> mRecycleBin;
 
-	private List<Integer> mChildWidths = new ArrayList<Integer>();
-	private List<Integer> mChildHeights = new ArrayList<Integer>();
-
-
 	private boolean mDataChanged = false;
 
 	private IFlingRunnable mFlingRunnable;
@@ -518,8 +514,6 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 		}
 
 		mAdapter = adapter;
-		mChildWidths.clear();
-		mChildHeights.clear();
 
 		if ( mAdapter != null ) {
 			mAdapterItemCount = mAdapter.getCount();
@@ -534,8 +528,6 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			mRecycleBin = Collections.synchronizedList( new ArrayList<Queue<View>>() );
 			for ( int i = 0; i < total; i++ ) {
 				mRecycleBin.add( new LinkedList<View>() );
-				mChildWidths.add( -1 );
-				mChildHeights.add( -1 );
 			}
 		}
 		reset();
@@ -611,11 +603,13 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 		forceChildLayout( child, params );
 	}
 
-	public void forceChildLayout( View child, LayoutParams params ) {
-		int childHeightSpec = ViewGroup.getChildMeasureSpec( mHeightMeasureSpec, getPaddingTop() + getPaddingBottom(),
-				params.height );
-		int childWidthSpec = ViewGroup.getChildMeasureSpec( mWidthMeasureSpec, getPaddingLeft() + getPaddingRight(), params.width );
-		child.measure( childWidthSpec, childHeightSpec );
+	public void forceChildLayout(View child, LayoutParams params) {
+		int childHeightSpec = ViewGroup.getChildMeasureSpec(mHeightMeasureSpec,
+				getPaddingTop() + getPaddingBottom(), params.height);
+		int childWidthSpec = ViewGroup.getChildMeasureSpec(mWidthMeasureSpec,
+				getPaddingLeft() + getPaddingRight(), params.width);
+
+		child.measure(childWidthSpec, childHeightSpec );
 	}
 
 	@SuppressWarnings ( "unused" )
@@ -671,14 +665,15 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 		for ( int i = 0; i < getChildCount(); i++ ) {
 			View child = getChildAt( i );
-
-			forceChildLayout( child, child.getLayoutParams() );
+			LayoutParams params = child.getLayoutParams();
+			Log.v(LOG_TAG, String.format("req width: %d", params.width));
+			forceChildLayout( child, params );
 
 			left = child.getLeft();
 			right = child.getRight();
 
 			int childHeight = child.getHeight();
-
+			Log.v(LOG_TAG, String.format("width: %d", child.getMeasuredWidth()));
 			layoutChild( child, left, right, childHeight );
 			// child.layout( left, top, right, top + childHeight );
 		}
@@ -727,8 +722,8 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			child.setSelected( selected );
 			addAndMeasureChild( child, 0 );
 
-			int childWidth = mChildWidths.get( viewType );
-			int childHeight = mChildHeights.get( viewType );
+			int childWidth = child.getMeasuredWidth();
+			int childHeight = child.getMeasuredHeight();
 
 			layoutChild( child, leftEdge - childWidth, leftEdge, childHeight );
 
@@ -821,17 +816,9 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			View child = mAdapter.getView( mRightViewIndex, mRecycleBin.get( viewType ).poll(), this );
 			child.setSelected( selected );
 			addAndMeasureChild( child, -1 );
-
-			int childWidth = mChildWidths.get( viewType );
-			int childHeight = mChildHeights.get( viewType );
-
-			if ( childWidth == -1 ) {
-				childWidth = child.getMeasuredWidth();
-				childHeight = child.getMeasuredHeight();
-
-				mChildWidths.set( viewType, childWidth );
-				mChildHeights.set( viewType, childHeight );
-			}
+			
+			int childWidth = child.getMeasuredWidth();
+			int childHeight = child.getMeasuredHeight();
 
 			if ( firstChild ) {
 				if ( mEdgesHeight == -1 ) {
@@ -863,12 +850,12 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	protected void layoutChild( View child, int left, int right, int childHeight ) {
 
-		// Log.i( LOG_TAG, "layoutChild. height: " + mHeight +
-		// ", child.height: "
-		// + childHeight );
+		Log.v(LOG_TAG, String.format(
+				"layutChild: width: %d, left: %d, right: %d", right - left,
+				left, right));
 
 		int top = mPaddingTop;
-		if ( mAlignMode == Gravity.BOTTOM ) {
+		if (mAlignMode == Gravity.BOTTOM ) {
 			top = top + ( mHeight - childHeight );
 		} else if ( mAlignMode == Gravity.CENTER ) {
 			top = top + ( mHeight - childHeight ) / 2;
