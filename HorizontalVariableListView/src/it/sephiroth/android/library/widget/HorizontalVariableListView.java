@@ -13,7 +13,7 @@ import it.sephiroth.android.library.utils.ReflectionUtils.ReflectionException;
 import it.sephiroth.android.library.widget.IFlingRunnable.FlingRunnableView;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -73,6 +73,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	public static final int OVER_SCROLL_IF_CONTENT_SCROLLS = 1;
 	public static final int OVER_SCROLL_NEVER = 2;
 
+	private static final boolean DEBUG = false;
 	protected static final String LOG_TAG = "horizontal-variable-list";
 
 	private static final float WIDTH_THRESHOLD = 1.1f;
@@ -87,14 +88,15 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	protected ListAdapter mAdapter;
 
-	private int mAdapterItemCount;
-
 	private int mLeftViewIndex = -1;
 	private int mRightViewIndex = 0;
 
 	private GestureDetector mGesture;
+	
+	private int mAdapterItemCount = 0;
 
-	private List<Queue<View>> mRecycleBin;
+	private List<Queue<View>> mRecycleBin = new ArrayList<Queue<View>>();
+	private HashMap<View, Integer> mRecycleViewType = new HashMap<View, Integer>();
 
 	private boolean mDataChanged = false;
 
@@ -122,6 +124,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	private OnScrollChangedListener mScrollListener;
 	private OnScrollFinishedListener mScrollFinishedListener;
 	private OnLayoutChangeListener mLayoutChangeListener;
+	
 
 	public void setOnItemDragListener( OnItemDragListener listener ) {
 		mItemDragListener = listener;
@@ -398,7 +401,10 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			}
 
 		} else {
-			Log.w( LOG_TAG, "This method has no effect on single selection list" );
+			if (DEBUG) {
+				Log.w(LOG_TAG,
+						"This method has no effect on single selection list");
+			}
 		}
 	}
 
@@ -419,13 +425,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 		@Override
 		public void onAdded() {
-			synchronized ( HorizontalVariableListView.this ) {
-				mAdapterItemCount = mAdapter.getCount();
-			}
-			Log.i( LOG_TAG, "onAdded: " + mAdapterItemCount );
-			mDataChanged = true;
-			mMaxX = Integer.MAX_VALUE;
-			requestLayout();
+			invalidateAdapter();
 		};
 
 		@Override
@@ -435,9 +435,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 		@Override
 		public void onChanged() {
-			mAdapterItemCount = mAdapter.getCount();
-			Log.i( LOG_TAG, "onChange: " + mAdapterItemCount );
-			reset();
+			invalidateAdapter();
 		};
 
 		@Override
@@ -451,24 +449,38 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 		@Override
 		public void onChanged() {
-			synchronized ( HorizontalVariableListView.this ) {
-				mAdapterItemCount = mAdapter.getCount();
-			}
-			Log.i( LOG_TAG, "onChanged(2): " + mAdapterItemCount );
-			invalidate();
-			reset();
+			invalidateAdapter();
 		}
 
 		@Override
 		public void onInvalidated() {
-			mAdapterItemCount = mAdapter.getCount();
-			Log.i( LOG_TAG, "onInvalidated(2): " + mAdapterItemCount );
-			invalidate();
-			reset();
+			invalidateAdapter();
 		}
 	};
 
 	public void requestFullLayout() {
+		mForceLayout = true;
+		invalidate();
+		requestLayout();
+	}
+
+	protected void invalidateAdapter() {
+		if (mAdapter == null) {
+			mAdapterItemCount = 0;
+		} else {
+			mAdapterItemCount = mAdapter.getCount();
+		}
+		if (mLeftViewIndex > mAdapterItemCount
+				|| mRightViewIndex > mAdapterItemCount) {
+
+			scrollTo(0, 0);
+			mCurrentX = getScrollX();
+//			removeNonVisibleItems(mCurrentX);
+			removeAllItems();
+			mLeftViewIndex = -1;
+			mRightViewIndex = 0;
+			fillList( mCurrentX );
+		}
 		mForceLayout = true;
 		invalidate();
 		requestLayout();
@@ -509,55 +521,50 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 				mAdapter.unregisterDataSetObserver( mDataObserver );
 			}
 
-			emptyRecycler();
-			mAdapterItemCount = 0;
 		}
 
 		mAdapter = adapter;
 
 		if ( mAdapter != null ) {
-			mAdapterItemCount = mAdapter.getCount();
 
 			if ( mAdapter instanceof BaseAdapterExtended ) {
 				( (BaseAdapterExtended) mAdapter ).registerDataSetObserverExtended( mDataObserverExtended );
 			} else {
 				mAdapter.registerDataSetObserver( mDataObserver );
 			}
-			int total = mAdapter.getViewTypeCount();
-
-			mRecycleBin = Collections.synchronizedList( new ArrayList<Queue<View>>() );
-			for ( int i = 0; i < total; i++ ) {
-				mRecycleBin.add( new LinkedList<View>() );
-			}
 		}
 		reset();
 	}
 
 	private void emptyRecycler() {
-		if ( null != mRecycleBin ) {
-			while ( mRecycleBin.size() > 0 ) {
-				Queue<View> recycler = mRecycleBin.remove( 0 );
-				recycler.clear();
-			}
-			mRecycleBin.clear();
+		removeAllViewsInLayout();
+		while (mRecycleBin.size() > 0) {
+			Queue<View> recycler = mRecycleBin.remove(0);
+			recycler.clear();
 		}
+		mRecycleViewType.clear();
 	}
 
 	/**
 	 * Reset.
 	 */
-	private synchronized void reset() {
+	private void reset() {
 		mCurrentX = 0;
+		emptyRecycler();
+		int total = mAdapter != null ? mAdapter.getViewTypeCount() : 0;
+		for ( int i = 0; i < total; i++ ) {
+			mRecycleBin.add( new LinkedList<View>() );
+		}
 		initView();
-		removeAllViewsInLayout();
-		mForceLayout = true;
-		requestLayout();
+		invalidateAdapter();
 	}
 
 	@Override
 	protected void onDetachedFromWindow() {
 		super.onDetachedFromWindow();
-		Log.d( LOG_TAG, "onDetachedFromWindow" );
+		if (DEBUG) {
+			Log.d(LOG_TAG, "onDetachedFromWindow");
+		}
 
 		removeCallbacks( mScrollNotifier );
 		emptyRecycler();
@@ -666,14 +673,18 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 		for ( int i = 0; i < getChildCount(); i++ ) {
 			View child = getChildAt( i );
 			LayoutParams params = child.getLayoutParams();
-			Log.v(LOG_TAG, String.format("req width: %d", params.width));
+			if (DEBUG) {
+				Log.v(LOG_TAG, String.format("req width: %d", params.width));
+			}
 			forceChildLayout( child, params );
 
 			left = child.getLeft();
 			right = child.getRight();
 
 			int childHeight = child.getHeight();
-			Log.v(LOG_TAG, String.format("width: %d", child.getMeasuredWidth()));
+			if (DEBUG) {
+				Log.v(LOG_TAG, String.format("width: %d", child.getMeasuredWidth()));
+			}
 			layoutChild( child, left, right, childHeight );
 			// child.layout( left, top, right, top + childHeight );
 		}
@@ -717,8 +728,8 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 		while ( ( leftEdge - positionX ) > mLeftEdge && mLeftViewIndex >= 0 ) {
 			final boolean selected = getIsSelected( mLeftViewIndex );
-			int viewType = mAdapter.getItemViewType( mLeftViewIndex );
-			View child = mAdapter.getView( mLeftViewIndex, mRecycleBin.get( viewType ).poll(), this );
+			View child = getRecycleView(mLeftViewIndex);
+			
 			child.setSelected( selected );
 			addAndMeasureChild( child, 0 );
 
@@ -730,6 +741,14 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			leftEdge -= childWidth;
 			mLeftViewIndex--;
 		}
+	}
+
+	private View getRecycleView(int index) {
+		int viewType = mAdapter.getItemViewType(index);
+		View recycleView = mRecycleBin.get(viewType).poll();
+		View child = mAdapter.getView(index, recycleView, this);
+		mRecycleViewType.put(child, viewType);
+		return child;
 	}
 
 	public View getItemAt( int position ) {
@@ -812,8 +831,8 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			}
 
 			final boolean selected = getIsSelected( mRightViewIndex );
-			int viewType = mAdapter.getItemViewType( mRightViewIndex );
-			View child = mAdapter.getView( mRightViewIndex, mRecycleBin.get( viewType ).poll(), this );
+
+			View child = getRecycleView(mRightViewIndex);
 			child.setSelected( selected );
 			addAndMeasureChild( child, -1 );
 			
@@ -850,9 +869,11 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	protected void layoutChild( View child, int left, int right, int childHeight ) {
 
-		Log.v(LOG_TAG, String.format(
-				"layutChild: width: %d, left: %d, right: %d", right - left,
-				left, right));
+		if (DEBUG) {
+			Log.v(LOG_TAG, String.format(
+					"layutChild: width: %d, left: %d, right: %d", right - left,
+					left, right));
+		}
 
 		int top = mPaddingTop;
 		if (mAlignMode == Gravity.BOTTOM ) {
@@ -863,6 +884,19 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 		child.layout( left, top, right, top + childHeight );
 	}
+	
+	private void removeAllItems() {
+		while (getChildCount() > 0) {
+			View child = getChildAt(0);
+			recycleChildView(child);
+		}
+	}
+
+	private void recycleChildView(View child) {
+		Integer viewType = mRecycleViewType.remove(child);
+		mRecycleBin.get(viewType).offer(child);
+		removeViewInLayout(child);
+	}
 
 	/**
 	 * Removes the non visible items.
@@ -871,34 +905,19 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	 *            the position x
 	 */
 	private void removeNonVisibleItems( final int positionX ) {
-		View child = getChildAt( 0 );
-
-		// remove to left...
-		while ( child != null && child.getRight() - positionX <= mLeftEdge ) {
-
-			if ( null != mAdapter ) {
-				int position = getPositionForView( child );
-				int viewType = mAdapter.getItemViewType( position );
-				mRecycleBin.get( viewType ).offer( child );
+//		View child = getChildAt( 0 );
+		int pos = 0;
+		while (pos < getChildCount()) {
+			View child = getChildAt(pos);
+			if (child.getRight() - positionX <= mLeftEdge) {
+				recycleChildView(child);
+				mLeftViewIndex++;
+			} else if (child.getLeft() - positionX >= mRightEdge) {
+				recycleChildView(child);
+				mRightViewIndex--;
+			} else {
+				pos += 1;
 			}
-			removeViewInLayout( child );
-			mLeftViewIndex++;
-			child = getChildAt( 0 );
-		}
-
-		// remove to right...
-		child = getChildAt( getChildCount() - 1 );
-		while ( child != null && child.getLeft() - positionX >= mRightEdge ) {
-
-			if ( null != mAdapter ) {
-				int position = getPositionForView( child );
-				int viewType = mAdapter.getItemViewType( position );
-				mRecycleBin.get( viewType ).offer( child );
-			}
-
-			removeViewInLayout( child );
-			mRightViewIndex--;
-			child = getChildAt( getChildCount() - 1 );
 		}
 	}
 
@@ -1782,5 +1801,20 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	public int getGravity() {
 		return mAlignMode;
+	}
+	
+	@Override
+	public int getCount() {
+		return mAdapterItemCount;
+	}
+	
+	@Override
+	public int getFirstVisiblePosition() {
+		return mLeftViewIndex;
+	}
+	
+	@Override
+	public int getLastVisiblePosition() {
+		return mRightViewIndex;
 	}
 }
