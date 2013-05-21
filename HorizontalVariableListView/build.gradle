@@ -1,0 +1,106 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:0.4'
+    }
+}
+
+apply plugin: 'android-library'
+apply plugin: 'maven'
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    deployerJars
+}
+
+dependencies {
+    deployerJars "org.apache.maven.wagon:wagon-ssh:2.2"
+    compile fileTree(dir: 'libs', include: '*.jar')
+}
+
+version = "1.0"
+archivesBaseName = "horizontalvariablelistview"
+group = "com.appunite"
+
+android {
+    compileSdkVersion 16
+    buildToolsVersion "17"
+
+    defaultConfig {
+        minSdkVersion 8
+        targetSdkVersion 15
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            resources.srcDirs = ['src']
+            aidl.srcDirs = ['src']
+            renderscript.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+        }
+
+        instrumentTest.setRoot('tests')
+    }
+}
+
+task createPomFile {
+    project.ext.pomFile = pom {
+        version = project.version
+        artifactId = project.archivesBaseName
+        groupId = project.group
+        project {
+            name 'HorizontalVariableListView'
+            description 'library to add animations.'
+            url 'https://github.com/sephiroth74/HorizontalVariableListView'
+            inceptionYear '2012'
+
+            licenses {
+                license {
+                    name 'MIT License'
+                    url 'http://opensource.org/licenses/MIT'
+                    distribution 'repo'
+                }
+            }
+
+            scm {
+                url "https://github.com/sephiroth74/HorizontalVariableListView"
+                connection "https://github.com/sephiroth74/HorizontalVariableListView.git"
+            }
+            developers {
+                developer {
+                    name 'Alessandro Crugnola'
+                }
+            }
+        }
+    }
+}
+
+task install(type: Upload, dependsOn: createPomFile) {
+    description = "Upload archives to local repository"
+    configuration = configurations.archives
+    repositories.mavenInstaller {
+        pom = project.ext.pomFile
+    }
+}
+
+uploadArchives {
+    description = "Upload archives to maven repository"
+    dependsOn createPomFile
+    repositories {
+        mavenDeployer {
+            configuration = configurations.deployerJars
+            repository(url: "sftp://mavenrepo@192.158.30.128/repository/") {
+                authentication(userName: "mavenrepo")
+            }
+            pom = project.ext.pomFile
+        }
+    }
+}
