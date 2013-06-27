@@ -7,16 +7,6 @@
 
 package it.sephiroth.android.library.widget;
 
-import it.sephiroth.android.library.utils.DataSetObserverExtended;
-import it.sephiroth.android.library.utils.ReflectionUtils;
-import it.sephiroth.android.library.utils.ReflectionUtils.ReflectionException;
-import it.sephiroth.android.library.widget.IFlingRunnable.FlingRunnableView;
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
 import android.content.Context;
 import android.database.DataSetObserver;
 import android.graphics.Canvas;
@@ -28,6 +18,7 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseBooleanArray;
+import android.util.SparseIntArray;
 import android.view.GestureDetector;
 import android.view.GestureDetector.OnGestureListener;
 import android.view.Gravity;
@@ -42,6 +33,18 @@ import android.view.ViewParent;
 import android.view.ViewTreeObserver.OnScrollChangedListener;
 import android.widget.AdapterView;
 import android.widget.ListAdapter;
+
+import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
+
+import it.sephiroth.android.library.utils.DataSetObserverExtended;
+import it.sephiroth.android.library.utils.ReflectionUtils;
+import it.sephiroth.android.library.utils.ReflectionUtils.ReflectionException;
+import it.sephiroth.android.library.widget.IFlingRunnable.FlingRunnableView;
 
 public class HorizontalVariableListView extends HorizontalListView implements OnGestureListener, FlingRunnableView {
 
@@ -124,8 +127,9 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	private OnScrollChangedListener mScrollListener;
 	private OnScrollFinishedListener mScrollFinishedListener;
 	private OnLayoutChangeListener mLayoutChangeListener;
-	
 
+    private SparseIntArray mChildsRight = new SparseIntArray();
+	
 	public void setOnItemDragListener( OnItemDragListener listener ) {
 		mItemDragListener = listener;
 	}
@@ -666,6 +670,43 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	}
 
+    public void scrollToPosition(int position) {
+        position -= 1;
+        if (mAdapter.getCount() < position) {
+            return;
+        }
+
+        int x = mChildsRight.get(position, -1);
+        if (x > 0) {
+            syncList(x);
+            return;
+        }
+
+        int offset = 500;
+        int iteration = 0;
+        int newX = mRightEdge;
+        while (iteration < 30) {
+            newX += offset;
+            trackMotionScroll(newX);
+            x = mChildsRight.get(position, -1);
+            if (x > 0) {
+                syncList(x);
+                return;
+            }
+
+            iteration++;
+        }
+    }
+
+    private void syncList(int newX) {
+        mForceLayout = true;
+        if (mMaxX < newX) {
+            mMaxX = newX;
+        }
+
+        trackMotionScroll(newX);
+    }
+
 	public void layoutChildren() {
 
 		int left, right;
@@ -688,16 +729,15 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			layoutChild( child, left, right, childHeight );
 			// child.layout( left, top, right, top + childHeight );
 		}
-	}
+    }
 
-	/**
+    /**
 	 * Fill list.
 	 * 
 	 * @param positionX
 	 *            the position x
 	 */
 	private void fillList( final int positionX ) {
-
 		int edge = 0;
 
 		View child = getChildAt( getChildCount() - 1 );
@@ -851,20 +891,18 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 			layoutChild( child, rightEdge, rightEdge + childWidth, childHeight );
 			rightEdge += childWidth;
+
+            int last = mChildsRight.get(mRightViewIndex - 1, 0);
+            mChildsRight.put(mRightViewIndex, last + child.getWidth());
+
+            mMaxX = Math.max(child.getWidth() * mAdapterItemCount, mMaxX);
+
 			mRightViewIndex++;
 		}
 
-		if ( mRightViewIndex == mAdapterItemCount ) {
-			// Log.i( LOG_TAG, "itemCount: " + mAdapterItemCount );
-			// Log.i( LOG_TAG, "rightEdge: " + rightEdge );
-			// Log.i( LOG_TAG, "realWidth: " + realWidth );
-			if ( rightEdge > realWidth ) {
-				mMaxX = rightEdge - realWidth;
-			} else {
-				mMaxX = 0;
-			}
-			// Log.i( LOG_TAG, "maxX: " + mMaxX );
-		}
+        if (mRightViewIndex == mAdapterItemCount) {
+            mMaxX = Math.max(rightEdge - realWidth, 0);
+        }
 	}
 
 	protected void layoutChild( View child, int left, int right, int childHeight ) {
@@ -938,6 +976,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	@Override
 	public boolean onFling( MotionEvent event0, MotionEvent event1, float velocityX, float velocityY ) {
+        velocityX *= 0.55f; // slow down velocity a little
 		if ( mMaxX == 0 ) return false;
 		mCanCheckDrag = false;
 		mWasFlinging = true;
