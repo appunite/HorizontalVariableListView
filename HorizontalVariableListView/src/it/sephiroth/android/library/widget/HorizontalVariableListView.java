@@ -851,19 +851,11 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 			layoutChild( child, rightEdge, rightEdge + childWidth, childHeight );
 			rightEdge += childWidth;
-			mRightViewIndex++;
-		}
 
-		if ( mRightViewIndex == mAdapterItemCount ) {
-			// Log.i( LOG_TAG, "itemCount: " + mAdapterItemCount );
-			// Log.i( LOG_TAG, "rightEdge: " + rightEdge );
-			// Log.i( LOG_TAG, "realWidth: " + realWidth );
-			if ( rightEdge > realWidth ) {
-				mMaxX = rightEdge - realWidth;
-			} else {
-				mMaxX = 0;
-			}
-			// Log.i( LOG_TAG, "maxX: " + mMaxX );
+            if (mRightViewIndex == mAdapterItemCount - 1) {
+                mMaxX = Math.max(rightEdge - realWidth, 0);
+            }
+			mRightViewIndex++;
 		}
 	}
 
