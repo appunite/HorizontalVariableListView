@@ -129,6 +129,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	private OnLayoutChangeListener mLayoutChangeListener;
 
     private SparseIntArray mChildsRight = new SparseIntArray();
+    private SparseIntArray mChildsWidths = new SparseIntArray();
 	
 	public void setOnItemDragListener( OnItemDragListener listener ) {
 		mItemDragListener = listener;
@@ -479,7 +480,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 			scrollTo(0, 0);
 			mCurrentX = getScrollX();
-//			removeNonVisibleItems(mCurrentX);
+			removeNonVisibleItems(mCurrentX);
 			removeAllItems();
 			mLeftViewIndex = -1;
 			mRightViewIndex = 0;
@@ -894,8 +895,10 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
             int last = mChildsRight.get(mRightViewIndex - 1, 0);
             mChildsRight.put(mRightViewIndex, last + child.getWidth());
+            mChildsWidths.put(mRightViewIndex, child.getWidth());
 
-            mMaxX = Math.max(child.getWidth() * mAdapterItemCount, mMaxX);
+            mMaxX = getAvgWidth() * mAdapterItemCount;
+            Log.d("CurrentMax", "[Current] -  Max X-value is equal to  " + mMaxX);
 
 			mRightViewIndex++;
 		}
@@ -904,6 +907,20 @@ public class HorizontalVariableListView extends HorizontalListView implements On
             mMaxX = Math.max(rightEdge - realWidth, 0);
         }
 	}
+
+    private int getAvgWidth() {
+        int count = 0;
+        int sum = 0;
+        for (int i = 0; i < mChildsWidths.size(); i++) {
+            int width = mChildsWidths.get(i);
+            if (width > 0) {
+                count++;
+                sum += width;
+            }
+        }
+
+        return sum / count;
+    }
 
 	protected void layoutChild( View child, int left, int right, int childHeight ) {
 
@@ -976,7 +993,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	@Override
 	public boolean onFling( MotionEvent event0, MotionEvent event1, float velocityX, float velocityY ) {
-        velocityX *= 0.55f; // slow down velocity a little
+        velocityX *= 0.2f; 
 		if ( mMaxX == 0 ) return false;
 		mCanCheckDrag = false;
 		mWasFlinging = true;
