@@ -2,6 +2,7 @@ package it.sephiroth.android.library.widget;
 
 import android.annotation.TargetApi;
 import android.view.View;
+import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.OverScroller;
 
@@ -33,7 +34,7 @@ class Fling9Runnable extends IFlingRunnable {
 
 	@Override
 	protected void _startUsingVelocity( int initialX, int velocity ) {
-		mScroller.fling( initialX, 0, velocity, 0, mParent.getMinX(), mParent.getMaxX(), 0, Integer.MAX_VALUE, 10, 0 );
+        mScroller.fling(initialX, 0, velocity, 0, mParent.getMinX(), mParent.getMaxX(), 0, 0, 10, 0);
 	}
 
 	@Override
@@ -53,6 +54,6 @@ class Fling9Runnable extends IFlingRunnable {
 
 	@Override
 	protected void forceFinished( boolean finished ) {
-		mScroller.abortAnimation();
+        mScroller.forceFinished(finished);
 	}
 }

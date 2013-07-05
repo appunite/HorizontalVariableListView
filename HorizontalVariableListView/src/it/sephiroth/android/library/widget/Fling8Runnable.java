@@ -1,6 +1,7 @@
 package it.sephiroth.android.library.widget;
 
 import android.view.View;
+import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Scroller;
 
@@ -10,7 +11,7 @@ class Fling8Runnable extends IFlingRunnable {
 
 	public Fling8Runnable( FlingRunnableView parent, int animationDuration ) {
 		super( parent, animationDuration );
-		mScroller = new Scroller( ( (View) parent ).getContext(), new DecelerateInterpolator() );
+		mScroller = new Scroller( ( (View) parent ).getContext(), new DecelerateInterpolator());
 	}
 
 	@Override
@@ -25,7 +26,7 @@ class Fling8Runnable extends IFlingRunnable {
 
 	@Override
 	protected void _startUsingVelocity( int initialX, int velocity ) {
-		mScroller.fling( initialX, 0, velocity, 0, mParent.getMinX(), mParent.getMaxX(), 0, Integer.MAX_VALUE );
+		mScroller.fling( initialX, 0, velocity, 0, mParent.getMinX(), mParent.getMaxX(), 0, 0);
 	}
 
 	@Override

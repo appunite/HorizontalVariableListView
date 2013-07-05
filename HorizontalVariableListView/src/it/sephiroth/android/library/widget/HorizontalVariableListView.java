@@ -215,7 +215,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 		ViewConfiguration configuration = ViewConfiguration.get( getContext() );
 		mTouchSlop = configuration.getScaledTouchSlop();
 		mDragTolerance = mTouchSlop;
-		mOverscrollDistance = 10;
+		mOverscrollDistance = 0;
 		mMaximumVelocity = configuration.getScaledMaximumFlingVelocity();
 		mMinimumVelocity = configuration.getScaledMinimumFlingVelocity();
 
@@ -247,11 +247,9 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	@Override
 	public void trackMotionScroll( int newX ) {
-
-		scrollTo( newX, 0 );
+        scrollTo( newX, 0 );
 		mCurrentX = getScrollX();
 		removeNonVisibleItems( mCurrentX );
-
 		fillList( mCurrentX );
 		invalidate();
 	}
@@ -472,24 +470,29 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	protected void invalidateAdapter() {
 		if (mAdapter == null) {
 			mAdapterItemCount = 0;
+            return;
 		} else {
 			mAdapterItemCount = mAdapter.getCount();
 		}
 		if (mLeftViewIndex > mAdapterItemCount
 				|| mRightViewIndex > mAdapterItemCount) {
-
-			scrollTo(0, 0);
-			mCurrentX = getScrollX();
-			removeNonVisibleItems(mCurrentX);
-			removeAllItems();
-			mLeftViewIndex = -1;
-			mRightViewIndex = 0;
-			fillList( mCurrentX );
+            resetList();
 		}
-		mForceLayout = true;
-		invalidate();
-		requestLayout();
+        requestFullLayout();
 	}
+
+    private void resetList() {
+        if (!mFlingRunnable.isFinished()) {
+            mFlingRunnable.forceFinished(true);
+        }
+        scrollTo(0, 0);
+        mCurrentX = getScrollX();
+        removeNonVisibleItems(mCurrentX);
+        removeAllItems();
+        mLeftViewIndex = -1;
+        mRightViewIndex = 0;
+        fillList( mCurrentX );
+    }
 
 	/** The m height measure spec. */
 	private int mHeightMeasureSpec;
@@ -700,11 +703,17 @@ public class HorizontalVariableListView extends HorizontalListView implements On
     }
 
     private void syncList(int newX) {
-        mForceLayout = true;
-        if (mMaxX < newX) {
-            mMaxX = newX;
+        int realWidth = getWidth();
+        int half = realWidth / 2;
+        if (newX < half || mMaxX < realWidth) {
+            newX = 0;
+        } else if (newX > half && newX + half < mMaxX) {
+            newX -= half;
+        } else if (mMaxX - newX < realWidth) {
+            newX = mMaxX - realWidth;
         }
 
+        mForceLayout = true;
         trackMotionScroll(newX);
     }
 
@@ -893,18 +902,15 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			layoutChild( child, rightEdge, rightEdge + childWidth, childHeight );
 			rightEdge += childWidth;
 
-            int last = mChildsRight.get(mRightViewIndex - 1, 0);
-            mChildsRight.put(mRightViewIndex, last + child.getWidth());
+            int right = child.getRight();
+            mChildsRight.put(mRightViewIndex, right);
             mChildsWidths.put(mRightViewIndex, child.getWidth());
 
-            mMaxX = getAvgWidth() * mAdapterItemCount;
+            int avgWidth = getAvgWidth() * mAdapterItemCount;
+            mMaxX = Math.max(avgWidth - realWidth, 0);
 
 			mRightViewIndex++;
 		}
-
-        if (mRightViewIndex == mAdapterItemCount) {
-            mMaxX = Math.max(rightEdge - realWidth, 0);
-        }
 	}
 
     private int getAvgWidth() {
@@ -992,7 +998,6 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	@Override
 	public boolean onFling( MotionEvent event0, MotionEvent event1, float velocityX, float velocityY ) {
-        velocityX *= 0.2f; 
 		if ( mMaxX == 0 ) return false;
 		mCanCheckDrag = false;
 		mWasFlinging = true;
@@ -1562,7 +1567,6 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 			int maxOverScrollX, int maxOverScrollY, boolean isTouchEvent ) {
 
 		final int overScrollMode = mOverScrollMode;
-		final boolean toLeft = deltaX > 0;
 		final boolean overScrollHorizontal = overScrollMode == OVER_SCROLL_ALWAYS;
 
 		int newScrollX = scrollX + deltaX;
@@ -1575,36 +1579,27 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 		final int right = mMaxX == Integer.MAX_VALUE ? mMaxX : ( mMaxX + maxOverScrollX );
 
 		boolean clampedX = false;
-		if ( newScrollX > right && toLeft ) {
+		if (newScrollX > right) {
 			newScrollX = right;
-			deltaX = mMaxX - scrollX;
 			clampedX = true;
-		} else if ( newScrollX < left && !toLeft ) {
+		} else if (newScrollX < left) {
 			newScrollX = left;
-			deltaX = mMinX - scrollX;
 			clampedX = true;
 		}
 
-		onScrolling( newScrollX, deltaX, clampedX );
+		onScrolling( newScrollX, clampedX );
 		return clampedX;
 	}
 
-	public boolean onScrolling( int scrollX, int deltaX, boolean clampedX ) {
-		if ( mAdapter == null ) return true;
-
-		if ( !mFlingRunnable.isFinished() ) {
-			mCurrentX = getScrollX();
-			if ( clampedX ) {
-				mFlingRunnable.springBack( scrollX, 0, mMinX, mMaxX, 0, 0 );
-			}
-		} else {
-			trackMotionScroll( scrollX );
-		}
-
+	public boolean onScrolling( int scrollX, boolean clampedX ) {
+        if ( mAdapter == null ) return true;
+        if (scrollX < mMaxX) {
+            trackMotionScroll(scrollX);
+        }
 		return true;
 	}
 
-	@Override
+    @Override
 	public void computeScroll() {
 
 		if ( mFlingRunnable.computeScrollOffset() ) {
@@ -1843,7 +1838,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	@Override
 	public int getMaxX() {
-		return Integer.MAX_VALUE;
+		return mMaxX;
 	}
 
 	public void setDragTolerance( int value ) {
