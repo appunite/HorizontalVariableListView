@@ -23,7 +23,7 @@ dependencies {
     compile fileTree(dir: 'libs', include: '*.jar')
 }
 
-version = "1.13"
+version = "1.14"
 archivesBaseName = "horizontalvariablelistview"
 group = "com.appunite"
 

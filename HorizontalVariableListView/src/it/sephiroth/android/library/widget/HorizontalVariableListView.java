@@ -677,6 +677,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
     public void scrollToPosition(int position) {
         position -= 1;
         if (mAdapter.getCount() < position) {
+	    trackMotionScroll(0);
             return;
         }
 
@@ -686,10 +687,10 @@ public class HorizontalVariableListView extends HorizontalListView implements On
             return;
         }
 
-        int offset = 500;
+        int offset = getWidth();
         int iteration = 0;
         int newX = mRightEdge;
-        while (iteration < 30) {
+        while (iteration < 20) {
             newX += offset;
             trackMotionScroll(newX);
             x = mChildsRight.get(position, -1);
@@ -698,8 +699,10 @@ public class HorizontalVariableListView extends HorizontalListView implements On
                 return;
             }
 
+	    newX += offset;
             iteration++;
         }
+	trackMotionScroll(0);
     }
 
     private void syncList(int newX) {
