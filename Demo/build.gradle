@@ -3,7 +3,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:0.4'
+        classpath 'com.android.tools.build:gradle:0.5.+'
     }
 }
 apply plugin: 'android'
@@ -17,7 +17,7 @@ repositories {
 
 dependencies {
     compile project(":HorizontalVariableListView")
-    //compile "com.appunite:horizontalvariablelistview:1.0"
+    //compile "com.appunite:horizontalvariablelistview:1.15"
 }
 
 android {
