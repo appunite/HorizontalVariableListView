@@ -36,7 +36,9 @@ import android.widget.ListAdapter;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -546,10 +548,11 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	private void emptyRecycler() {
 		removeAllViewsInLayout();
-		while (mRecycleBin.size() > 0) {
-			Queue<View> recycler = mRecycleBin.remove(0);
-			recycler.clear();
-		}
+        for (Iterator<Queue<View>> it = mRecycleBin.iterator(); it.hasNext(); ) {
+            final Queue<View> value = it.next();
+            value.clear();
+            it.remove();
+        }
 		mRecycleViewType.clear();
 	}
 
@@ -559,10 +562,6 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 	private void reset() {
 		mCurrentX = 0;
 		emptyRecycler();
-		int total = mAdapter != null ? mAdapter.getViewTypeCount() : 0;
-		for ( int i = 0; i < total; i++ ) {
-			mRecycleBin.add( new LinkedList<View>() );
-		}
 		initView();
 		invalidateAdapter();
 	}
@@ -796,9 +795,30 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 		}
 	}
 
+    private void recycleViewAddQueues(int viewType) {
+        int left = viewType - mRecycleBin.size() + 1;
+        if (left > 0) {
+            for (int i = 0; i < left; ++i) {
+                mRecycleBin.add(new LinkedList<View>());
+            }
+        }
+    }
+
+    private View recycleViewPull(int viewType) {
+        recycleViewAddQueues(viewType);
+        Queue<View> views = mRecycleBin.get(viewType);
+        return views.poll();
+    }
+
+    private void recycleViewOffer(int viewType, View view) {
+        recycleViewAddQueues(viewType);
+        Queue<View> views = mRecycleBin.get(viewType);
+        views.offer(view);
+    }
+
 	private View getRecycleView(int index) {
 		int viewType = mAdapter.getItemViewType(index);
-		View recycleView = mRecycleBin.get(viewType).poll();
+		View recycleView = recycleViewPull(viewType);
 		View child = mAdapter.getView(index, recycleView, this);
 		mRecycleViewType.put(child, viewType);
 		return child;
@@ -957,7 +977,7 @@ public class HorizontalVariableListView extends HorizontalListView implements On
 
 	private void recycleChildView(View child) {
 		Integer viewType = mRecycleViewType.remove(child);
-		mRecycleBin.get(viewType).offer(child);
+        recycleViewOffer(viewType, child);
 		removeViewInLayout(child);
 	}
 
